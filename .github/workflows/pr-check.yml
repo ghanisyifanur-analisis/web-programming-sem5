@@ -1,0 +1,40 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy environment file
+        run: cp .env.example .env
+
+      - name: Build and start services
+        run: docker compose up --build -d --wait
+
+      - name: Wait for web to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 | grep -q "200"; then
+              echo "Web is ready"
+              exit 0
+            fi
+            echo "Waiting for web..."
+            sleep 2
+          done
+          echo "Web did not become ready"
+          docker compose logs web
+          exit 1
+
+      - name: Smoke test homepage
+        run: curl -s -f http://localhost:8080 | grep -q "Sistem Data Mahasiswa"
+
+      - name: Tear down services
+        if: always()
+        run: docker compose down -v

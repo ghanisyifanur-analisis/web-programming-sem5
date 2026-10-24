@@ -1,0 +1,63 @@
+services:
+  db:
+    build:
+      context: ./docker/db
+      dockerfile: Dockerfile
+    container_name: wp-sem5-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 10
+    networks:
+      - wp-sem5-network
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wp-sem5-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - wp-sem5-network
+
+  pma:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: wp-sem5-pma
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "8081:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - wp-sem5-network
+
+volumes:
+  db_data:
+
+networks:
+  wp-sem5-network:
+    driver: bridge
